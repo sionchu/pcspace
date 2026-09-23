@@ -149,15 +149,18 @@ class Actions:
                     p=self.policy.mutable(item['source'],item['snapshot'])
                     if plan['action']=='recycle':self.recycler(p)
                     else:self._delete_tree(pid,p)
-                    self._reconcile_tree(item)
                     r['status']='done'
+                    try:self._reconcile_tree(item)
+                    except Exception as exc:
+                        r['warning']='File operation completed; refresh scan totals: '+type(exc).__name__
+                        if item.get('scan_id'):self.db.execute('UPDATE scans SET stale=1 WHERE id=?',(item['scan_id'],))
                 except Exception as e:r['error']=f'{type(e).__name__}: {str(e)[:220]}'
                 results.append(r);self.db.execute('UPDATE plans SET results=? WHERE id=?',(encode(results),pid))
             state='complete' if all(r['status']=='done' for r in results) else 'partial_failure'
         except Exception as e:
             state='partial_failure';results.append(dict(status='failed',error=str(e)[:220]))
         finally:
-            # Operations without scan context (API/tests/old clients) cannot reconcile a specific snapshot.
+            # Operations without scan context cannot reconcile a specific snapshot.
             if any(not x.get('scan_id') for x in plan['items']):self.db.execute('UPDATE scans SET stale=1')
             self.db.execute('UPDATE plans SET status=?,results=?,after_space=? WHERE id=?',(state,encode(results),encode(disks(self.policy)),pid))
 
@@ -182,14 +185,14 @@ class Actions:
             cur=row['parent']
             while inside(Path(cur),root):
                 parent=c.execute('SELECT parent FROM tree WHERE scan_id=? AND path=?',(sid,cur)).fetchone()
-                c.execute('''UPDATE tree SET logical_bytes=MAX(0,logical_bytes-?),files=MAX(0,files-?),
-                             candidate_bytes=MAX(0,candidate_bytes-?) WHERE scan_id=? AND path=?''',(*delta,sid,cur))
+                c.execute("UPDATE tree SET logical_bytes=MAX(0,logical_bytes-?),files=MAX(0,files-?),candidate_bytes=MAX(0,candidate_bytes-?) WHERE scan_id=? AND path=?",(*delta,sid,cur))
                 if Path(cur)==root or not parent:break
                 cur=parent['parent']
-            # Remove only the selected root row so the whole deleted subtree disappears from navigation immediately.
-            # Descendant snapshot rows are unreachable and can be pruned later; blocking deletion on DB cleanup is worse UX.
-            c.execute('DELETE FROM scan_queue WHERE scan_id=? AND path=?',(sid,str(p)))
-            c.execute('DELETE FROM tree WHERE scan_id=? AND path=?',(sid,str(p)))
+            # Indexed, separator-bounded range: includes descendants, never similarly named siblings.
+            low=str(p)+os.sep;high=str(p)+chr(ord(os.sep)+1)
+            for table in ('scan_queue','tree'):
+                c.execute(f'DELETE FROM {table} WHERE scan_id=? AND path>=? AND path<?',(sid,low,high))
+                c.execute(f'DELETE FROM {table} WHERE scan_id=? AND path=?',(sid,str(p)))
             rootrow=c.execute('SELECT logical_bytes,files FROM tree WHERE scan_id=? AND path=?',(sid,str(root))).fetchone()
             if rootrow:c.execute('UPDATE scans SET logical_bytes=?,files=? WHERE id=?',(rootrow['logical_bytes'],rootrow['files'],sid))
 

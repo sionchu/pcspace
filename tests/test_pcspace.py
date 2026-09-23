@@ -206,11 +206,12 @@ def test_native_windows_recycle_fixture_only(system):
     plan=app.state.actions.prepare([str(p)],'recycle');r=run(app,plan)
     assert r['status']=='complete',r;assert not p.exists()
 
+
 def test_missing_folder_hidden_and_deleted_path_redirects(system):
     app,root=system;p=root/'ghost';p.mkdir();(p/'a.bin').write_bytes(b'x'*123)
-    sid,_=scan(app,root);p.joinpath('a.bin').unlink();p.rmdir();c=client(app)
+    sid,_=scan(app,root);(p/'a.bin').unlink();p.rmdir();c=client(app)
     top=c.get('/api/tree',params={'scan_id':sid,'path':str(root)}).json()
-    assert top['missing_folders']==1 and not [x for x in top['folders'] if x['name']=='ghost']
+    assert top['missing_folders']==1 and not top['folders'] and top['scan']['stale']==1
     moved=c.get('/api/tree',params={'scan_id':sid,'path':str(p)}).json()
     assert moved['path']==str(root) and moved['redirected_from']==str(p)
 
@@ -224,6 +225,29 @@ def test_folder_delete_reconciles_current_scan_tree(system):
     assert rr['files']==0 and rr['logical_bytes']==0 and ss==rr
 
 def test_wsl_ubuntu_package_is_explained_not_called_junk():
-    p=Path(r'C:\Users\sample\AppData\Local\Packages\CanonicalGroupLimited.Ubuntu24.04LTS_79rhkp1fndgsc')
+    p=Path('C:/Users/sample/AppData/Local/Packages/CanonicalGroupLimited.Ubuntu24.04LTS_79rhkp1fndgsc')
     kind,hint=folder_hint(p)
     assert kind=='wsl' and 'WSL Ubuntu' in hint and '찌꺼기가 아님' in hint
+
+def test_reconcile_removes_descendants_and_queue_not_prefix_sibling(system):
+    app,root=system;p=root/'old';sub=p/'nested';sub.mkdir(parents=True);(sub/'a').write_bytes(b'x'*20)
+    other=root/'old-other';other.mkdir();(other/'keep').write_bytes(b'k'*10)
+    sid,_=scan(app,root)
+    app.state.db.execute('INSERT INTO scan_queue VALUES(?,?)',(sid,str(sub)))
+    plan=app.state.actions.prepare([str(p)],'delete',sid);assert run(app,plan)['status']=='complete'
+    assert app.state.db.one('SELECT * FROM tree WHERE scan_id=? AND path=?',(sid,str(sub))) is None
+    assert not app.state.db.rows('SELECT * FROM scan_queue WHERE scan_id=?',(sid,))
+    assert app.state.db.one('SELECT logical_bytes FROM tree WHERE scan_id=? AND path=?',(sid,str(other)))['logical_bytes']==10
+
+def test_completed_delete_not_reported_failed_when_index_update_fails(system,monkeypatch):
+    app,root=system;p=root/'test-only.txt';p.write_text('fixture');sid,_=scan(app,root)
+    def fail(item):raise RuntimeError('test index failure')
+    monkeypatch.setattr(app.state.actions,'_reconcile_tree',fail)
+    plan=app.state.actions.prepare([str(p)],'delete',sid);result=run(app,plan)
+    assert result['status']=='complete' and not p.exists()
+    assert 'warning' in result['results'][0]
+    assert app.state.db.one('SELECT stale FROM scans WHERE id=?',(sid,))['stale']==1
+
+def test_demo_asset_served_and_runtime_config_not_served(system):
+    c=client(system[0]);assert c.get('/static/demo.js').status_code==200
+    assert c.get('/static/policy.json').status_code==404

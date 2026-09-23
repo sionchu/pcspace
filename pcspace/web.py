@@ -87,7 +87,7 @@ def create_app(state=None,roots=None):
     def index():return FileResponse(STATIC/'index.html',media_type='text/html')
     @app.get('/static/{name}')
     def asset(name:str):
-        types={'app.js':'text/javascript','app.css':'text/css','icon.svg':'image/svg+xml'}
+        types={'demo.js':'text/javascript','app.js':'text/javascript','app.css':'text/css','icon.svg':'image/svg+xml'}
         if name not in types:raise HTTPException(404)
         return FileResponse(STATIC/name,media_type=types[name])
     @app.post('/api/session')
@@ -168,7 +168,9 @@ def create_app(state=None,roots=None):
                     elif pair[:2]>direct[0][:2]:heapq.heapreplace(direct,pair)
                 except OSError:excluded+=1
         files=[r for _,_,r in sorted(direct,reverse=True)]
-        if missing:db.execute('UPDATE scans SET stale=1 WHERE id=?',(scan_id,))
+        if missing:
+            db.execute('UPDATE scans SET stale=1 WHERE id=?',(scan_id,))
+            scan['stale']=1
         return {'scan':scan,'path':str(p),'redirected_from':str(requested) if requested!=p else None,
                 'parent':str(p.parent) if str(p)!=scan['root'] else None,'total':total,
                 'folders':folders,'files':files,'omitted_files':max(0,file_count-len(files)),

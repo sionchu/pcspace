@@ -1,4 +1,4 @@
-# Local runtime, historical deployment copies, and private data
+# Runtime and private configuration never belong in the repository.
 .deps/
 .update*/
 __pycache__/

@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.12', '3.13']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q -rs
+      - run: node tests/ui_state_test.mjs
+      - run: node tests/demo_test.mjs
+      - run: node --check pcspace/static/app.js
+      - run: python -m build
+      - run: python scripts/build_demo.py

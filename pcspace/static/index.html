@@ -1,14 +1,74 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PCSpace · 용량 지도</title><link rel="icon" href="/static/icon.svg"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
-<body><aside class="sidebar"><a class="brand" href="/"><span>P.</span><div>PCSpace<small>STORAGE EXPLORER</small></div></a><div class="side-caption">내 컴퓨터</div><div id="drives"></div><div class="side-caption">WORKSPACE</div><nav><button data-view="map" class="active">▦ <span>용량 지도</span></button><button data-view="history">◷ <span>작업 기록</span></button><button data-view="settings">⚙ <span>설정</span></button></nav><div class="side-bottom"><span class="live-dot"></span><span id="connection">PC 연결 중</span><small>파일은 이 PC 안에서 처리됩니다.<br>자동 삭제 · 파일 외부 전송 없음</small><span id="version">0.2.0</span></div></aside>
-<main><header><div>내 PC <span class="divider">/</span> <strong id="header-label">용량 지도</strong></div><div class="header-actions"><span class="pill">별도 비밀번호 없음</span><button id="refresh" title="새로고침">↻</button></div></header><div class="workspace">
-<section id="connect-error" hidden><h2>PC에 연결하지 못했습니다.</h2><p id="connection-message"></p><button id="retry">다시 연결</button></section>
-<section id="map-view"><div class="title-row"><div><div class="eyebrow">SEE WHAT TAKES UP SPACE</div><h1>큰 폴더부터, 한눈에.</h1><p>영역의 크기는 용량, 주황색은 정리 후보입니다. 폴더를 눌러 내려가세요.</p></div><button id="open-recycle" class="secondary">PC 휴지통 열기 ↗</button></div>
-<div class="scan-controls"><input id="scan-root" aria-label="분석할 폴더 경로" placeholder="D:\"><button id="start-scan" class="primary">분석 시작</button><button id="pause-scan" class="secondary" hidden>일시정지</button><button id="resume-scan" class="secondary" hidden>이어서 분석</button><select id="scan-selector" aria-label="분석 기록"></select></div>
-<div class="progress-row"><span class="status-dot" id="status-dot"></span><strong id="scan-status">분석할 드라이브를 선택하세요.</strong><span id="scan-progress"></span></div><div id="current-path" class="current-path"></div>
-<div class="metrics"><article><span>현재 폴더 집계</span><strong id="metric-total">—</strong><small id="metric-count">파일·폴더 용량을 읽습니다.</small></article><article class="candidate-metric"><span>정리 후보 크기 <b>판단 필요</b></span><strong id="metric-candidate">—</strong><small>캐시·빌드, 오래된 임시·설치·압축 파일</small></article><article><span>드라이브 실제 여유 공간</span><strong id="metric-free">—</strong><small id="metric-free-note">휴지통 이동만으로 공간은 늘지 않습니다.</small></article></div>
-<div id="scan-note" class="notice" hidden></div><div class="explore-bar"><div id="breadcrumbs" class="breadcrumbs"></div><div class="explore-actions"><button id="go-up" title="상위 폴더">↑</button><button id="open-folder" title="이 PC 탐색기로 열기">↗</button><select id="sort-mode" aria-label="정렬"><option value="size">전체 용량순</option><option value="candidates">정리 후보순</option></select></div></div>
-<div class="explorer"><section class="map-panel"><div class="panel-head"><strong>용량 지도</strong><div class="legend"><span><i class="blue"></i>일반</span><span><i class="orange"></i>정리 후보</span></div></div><div id="treemap" aria-label="클릭하여 탐색하는 폴더 용량 지도"><div class="empty">분석을 시작하면 상위 폴더부터 표시됩니다.</div></div><div class="map-foot">영역 면적 = 논리 크기 · 폴더 클릭 = 하위 탐색 · 체크 = 정리 대상 선택</div></section>
-<section class="list-panel"><div class="panel-head"><strong>현재 위치의 폴더·파일</strong><span id="row-count"></span></div><input id="search" placeholder="현재 위치에서 이름 검색" aria-label="이름 검색"><div id="entry-list" role="list"></div><div id="list-note" class="map-foot"></div></section></div>
-<div id="selection-bar" hidden><div><strong id="selection-count"></strong><span id="selection-size"></span><button id="clear-selection" class="text-button">선택 해제</button></div><div><button id="recycle-selected" class="primary">휴지통으로</button><button id="delete-selected" class="danger-outline">영구 삭제</button></div></div>
-</section><section id="history-view" hidden><div class="eyebrow">YOUR ACTIONS</div><h1>작업 기록</h1><p>선택한 대상, 실행 결과와 실제 여유 공간 변화를 확인하세요.</p><div id="history-list"></div></section><section id="settings-view" hidden><div class="eyebrow">LOCAL FIRST</div><h1>설정</h1><div class="settings-card"><h3>필요한 경계만 유지합니다.</h3><p>프로젝트·백업·모델·사진이라는 이유로 삭제를 막지 않습니다. 시스템, 인증정보 저장소, 클라우드 동기화 폴더, 직접 보호한 경로만 제외합니다.</p><p>PC에서는 자동 접속합니다. 원격에서는 허용된 본인 Tailscale 계정으로 접속합니다. 공개 인터넷에는 노출하지 않습니다.</p><h3>직접 보호할 폴더</h3><div class="scan-controls"><input id="protect-path" placeholder="보호할 폴더의 전체 경로"><button id="protect-folder">보호 추가</button></div><div id="policy-list"></div></div></section>
-</div></main><dialog id="operation-modal"><div class="modal-head"><h2 id="modal-title"></h2><button id="close-modal" aria-label="닫기">×</button></div><div id="modal-body"></div></dialog><div id="toast" role="status" hidden></div><div id="tooltip" hidden></div></body></html>
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="PCSpace: a local-first Windows storage explorer. Visualize large folders, review cleanup candidates, and choose what stays.">
+  <meta name="color-scheme" content="light dark">
+  <title>PCSpace · Storage explorer</title>
+  <link rel="icon" href="./static/icon.svg">
+  <link rel="stylesheet" href="./static/app.css">
+  <script src="./static/demo.js" defer></script>
+  <script src="./static/app.js" defer></script>
+</head>
+<body>
+  <a href="#map-view" class="skip-link">Skip to storage map</a>
+  <aside class="sidebar" aria-label="Workspace navigation">
+    <a class="brand" href="./" aria-label="PCSpace home"><span class="brand-mark"><i></i><i></i><i></i></span><span>PCSpace<small>STORAGE EXPLORER</small></span></a>
+    <div class="side-caption" data-en="YOUR DRIVES" data-ko="내 드라이브">내 드라이브</div>
+    <div id="drives"></div>
+    <div class="side-caption workspace-caption" data-en="WORKSPACE" data-ko="워크스페이스">워크스페이스</div>
+    <nav>
+      <button data-view="map" class="active"><span class="nav-icon">▦</span><span data-en="Storage map" data-ko="용량 지도">용량 지도</span></button>
+      <button data-view="history"><span class="nav-icon">◷</span><span data-en="Activity" data-ko="작업 기록">작업 기록</span></button>
+      <button data-view="settings"><span class="nav-icon">⚙</span><span data-en="Settings" data-ko="설정">설정</span></button>
+    </nav>
+    <div class="side-bottom">
+      <div class="local-card"><span class="live-dot"></span><span id="connection" data-en="Connecting locally" data-ko="PC 연결 중">PC 연결 중</span><p data-en="Your files stay on your PC. No uploads. No automatic deletion." data-ko="파일은 내 PC에 그대로. 외부 전송도, 자동 삭제도 없습니다.">파일은 내 PC에 그대로. 외부 전송도, 자동 삭제도 없습니다.</p></div>
+      <div class="side-meta"><span id="version">PCSpace</span><a href="https://github.com/sionchu/pcspace" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div>
+    </div>
+  </aside>
+  <main>
+    <header>
+      <div class="header-location"><span data-en="Workspace" data-ko="내 PC">내 PC</span><span class="divider">/</span><strong id="header-label">용량 지도</strong></div>
+      <div class="header-actions">
+        <span class="privacy-pill"><span class="live-dot"></span><span data-en="LOCAL FIRST" data-ko="로컬 우선">로컬 우선</span></span>
+        <select id="language" aria-label="Language"><option value="ko">한국어</option><option value="en">English</option></select>
+        <button id="theme-toggle" class="icon-button" aria-label="Switch color theme" title="Switch color theme">◐</button>
+        <button id="refresh" class="icon-button" aria-label="Refresh" title="Refresh">↻</button>
+      </div>
+    </header>
+    <div id="demo-banner" class="demo-banner" hidden><strong data-en="INTERACTIVE DEMO" data-ko="체험용 데모">체험용 데모</strong><span data-en="Synthetic sample data. Nothing on your device is scanned or changed." data-ko="가상 샘플 데이터입니다. 기기의 파일을 읽거나 바꾸지 않습니다.">가상 샘플 데이터입니다. 기기의 파일을 읽거나 바꾸지 않습니다.</span><a href="https://github.com/sionchu/pcspace" target="_blank" rel="noopener noreferrer" data-en="Get PCSpace ↗" data-ko="설치 안내 ↗">설치 안내 ↗</a></div>
+    <div class="workspace">
+      <section id="connect-error" class="notice" hidden><h2 data-en="Cannot connect to PCSpace" data-ko="PCSpace에 연결하지 못했습니다.">PCSpace에 연결하지 못했습니다.</h2><p id="connection-message"></p><button id="retry" data-en="Reconnect" data-ko="다시 연결">다시 연결</button></section>
+      <section id="map-view" tabindex="-1">
+        <div class="title-row">
+          <div><div class="eyebrow">LESS CLUTTER. MORE CLARITY.</div><h1 data-en="Your storage, made visible." data-ko="내 PC의 공간, 한눈에.">내 PC의 공간, 한눈에.</h1><p data-en="Start with the biggest folders. Keep what matters. Clear what doesn't." data-ko="큰 폴더부터 살펴보고, 필요한 것은 남기고 정리하세요.">큰 폴더부터 살펴보고, 필요한 것은 남기고 정리하세요.</p></div>
+          <button id="open-recycle" class="secondary"><span aria-hidden="true">♲</span> <span data-en="Open Recycle Bin" data-ko="PC 휴지통 열기">PC 휴지통 열기</span> ↗</button>
+        </div>
+        <div class="scan-box">
+          <div class="scan-controls"><label class="path-input"><span aria-hidden="true">▱</span><input id="scan-root" aria-label="Folder path to scan" placeholder="D:\" spellcheck="false"></label><button id="start-scan" class="primary" data-en="Analyze storage" data-ko="용량 분석">용량 분석</button><button id="pause-scan" hidden data-en="Pause" data-ko="일시정지">일시정지</button><button id="resume-scan" hidden data-en="Resume" data-ko="이어서 분석">이어서 분석</button><select id="scan-selector" aria-label="Scan history"></select></div>
+          <div class="progress-row"><span class="status-dot" id="status-dot"></span><strong id="scan-status" data-en="Choose a drive to get started." data-ko="분석할 드라이브를 선택하세요.">분석할 드라이브를 선택하세요.</strong><span id="scan-progress"></span></div><div id="current-path" class="current-path"></div>
+        </div>
+        <div class="metrics">
+          <article><div class="metric-label"><span data-en="CURRENT FOLDER" data-ko="현재 폴더 집계">현재 폴더 집계</span><span class="metric-icon">▦</span></div><strong id="metric-total">—</strong><small id="metric-count" data-en="Directory-first. Metadata only." data-ko="폴더 중심 · 파일 내용은 읽지 않습니다.">폴더 중심 · 파일 내용은 읽지 않습니다.</small></article>
+          <article class="candidate-metric"><div class="metric-label"><span data-en="CLEANUP CANDIDATES" data-ko="정리 후보 크기">정리 후보 크기</span><span class="review-badge" data-en="REVIEW" data-ko="검토 필요">검토 필요</span></div><strong id="metric-candidate">—</strong><small data-en="Hints, not permission to delete." data-ko="캐시·빌드·오래된 파일. 불필요 여부는 직접 판단합니다.">캐시·빌드·오래된 파일. 불필요 여부는 직접 판단합니다.</small></article>
+          <article><div class="metric-label"><span data-en="DRIVE FREE SPACE" data-ko="드라이브 실제 여유 공간">드라이브 실제 여유 공간</span><span class="metric-icon">↗</span></div><strong id="metric-free">—</strong><small id="metric-free-note" data-en="Measured from the drive." data-ko="드라이브에서 측정한 실제 여유 공간입니다.">드라이브에서 측정한 실제 여유 공간입니다.</small></article>
+        </div>
+        <div id="scan-note" class="notice" hidden></div>
+        <div class="explore-bar"><div id="breadcrumbs" class="breadcrumbs" aria-label="Folder breadcrumb"></div><div class="explore-actions"><button id="go-up" class="icon-button" aria-label="Parent folder" title="Parent folder">↑</button><button id="open-folder" class="icon-button" aria-label="Open on this PC" title="Open on this PC">↗</button><select id="sort-mode" aria-label="Sort"><option value="size" data-en="Largest first" data-ko="전체 용량순">전체 용량순</option><option value="candidates" data-en="Candidates first" data-ko="정리 후보순">정리 후보순</option></select></div></div>
+        <div class="explorer">
+          <section class="map-panel"><div class="panel-head"><div><strong data-en="Space at a glance" data-ko="폴더 용량 지도">폴더 용량 지도</strong><small data-en="Click a folder to explore inside" data-ko="폴더를 클릭하면 하위 항목이 펼쳐집니다.">폴더를 클릭하면 하위 항목이 펼쳐집니다.</small></div><div class="legend"><span><i class="blue"></i><span data-en="Files" data-ko="일반">일반</span></span><span><i class="orange"></i><span data-en="Candidates" data-ko="정리 후보">정리 후보</span></span></div></div><div id="treemap" aria-label="Interactive storage treemap"><div class="empty"><strong data-en="A clearer view starts here." data-ko="먼저 용량을 분석해 보세요.">먼저 용량을 분석해 보세요.</strong><span data-en="Choose a drive above, then analyze its folders." data-ko="드라이브를 고르고 분석하면 큰 폴더부터 표시됩니다.">드라이브를 고르고 분석하면 큰 폴더부터 표시됩니다.</span></div></div><div class="map-foot"><span data-en="Area = logical size" data-ko="영역 면적 = 논리 크기">영역 면적 = 논리 크기</span><span data-en="Checkbox = select for cleanup" data-ko="체크박스 = 정리 대상 선택">체크박스 = 정리 대상 선택</span></div></section>
+          <section class="list-panel"><div class="panel-head"><strong data-en="Folders & files" data-ko="현재 위치의 폴더·파일">현재 위치의 폴더·파일</strong><span id="row-count" class="count-badge"></span></div><div class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" placeholder="현재 위치에서 이름 검색" data-placeholder-en="Search this folder" data-placeholder-ko="현재 위치에서 이름 검색" aria-label="Search names"></div><div id="entry-list" role="list"></div><div id="list-note" class="list-foot"></div></section>
+        </div>
+        <div class="workspace-foot"><span data-en="Your files. Your decision." data-ko="내 파일의 필요 여부는, 내가 결정합니다.">내 파일의 필요 여부는, 내가 결정합니다.</span><a href="?demo=1" id="demo-link" data-en="Try the sample demo →" data-ko="샘플 화면 체험 →">샘플 화면 체험 →</a></div>
+        <div id="selection-bar" hidden><div class="selection-summary"><strong id="selection-count"></strong><span id="selection-size"></span><button id="clear-selection" class="text-button" data-en="Clear selection" data-ko="선택 해제">선택 해제</button></div><div class="selection-actions"><button id="recycle-selected" class="primary" data-en="Move to Recycle Bin" data-ko="휴지통으로">휴지통으로</button><button id="delete-selected" class="danger-outline" data-en="Delete permanently" data-ko="영구 삭제">영구 삭제</button></div></div>
+      </section>
+      <section id="history-view" hidden><div class="eyebrow">YOUR ACTIONS</div><h1 data-en="Activity" data-ko="작업 기록">작업 기록</h1><p data-en="What changed, which items succeeded, and what needs your attention." data-ko="선택한 대상, 실행 결과, 확인할 항목을 기록합니다.">선택한 대상, 실행 결과, 확인할 항목을 기록합니다.</p><div id="history-list"></div></section>
+      <section id="settings-view" hidden><div class="eyebrow">LOCAL FIRST, ALWAYS</div><h1 data-en="Settings" data-ko="설정">설정</h1><div class="settings-card"><h3 data-en="Simple controls. Real boundaries." data-ko="복잡한 절차 대신, 필요한 경계만.">복잡한 절차 대신, 필요한 경계만.</h3><p data-en="Projects, backups and original media are not locked just because of their names. System paths, credential stores, cloud links and explicitly protected paths are excluded." data-ko="프로젝트·백업·원본이라는 이유로 잠그지 않습니다. 시스템·인증정보 경로·클라우드 링크·직접 보호한 폴더는 제외합니다.">프로젝트·백업·원본이라는 이유로 잠그지 않습니다. 시스템·인증정보 경로·클라우드 링크·직접 보호한 폴더는 제외합니다.</p><p data-en="No extra password on this PC. Optional remote access uses your private Tailscale identity. Never expose the backend to the public internet." data-ko="PC에서는 바로 접속합니다. 원격 접속은 비공개 Tailscale 본인 인증을 사용하며, 백엔드를 공개 인터넷에 연결하지 않습니다.">PC에서는 바로 접속합니다. 원격 접속은 비공개 Tailscale 본인 인증을 사용하며, 백엔드를 공개 인터넷에 연결하지 않습니다.</p><h3 data-en="Protect a folder" data-ko="직접 보호할 폴더">직접 보호할 폴더</h3><div class="scan-controls"><input id="protect-path" placeholder="보호할 폴더의 전체 경로" data-placeholder-en="Full path to protect" data-placeholder-ko="보호할 폴더의 전체 경로"><button id="protect-folder" data-en="Add protection" data-ko="보호 추가">보호 추가</button></div><div id="policy-list"></div></div></section>
+    </div>
+  </main>
+  <dialog id="operation-modal"><div class="modal-head"><h2 id="modal-title"></h2><button id="close-modal" class="icon-button" aria-label="Close">×</button></div><div id="modal-body"></div></dialog>
+  <div id="toast" role="status" aria-live="polite" hidden></div><div id="tooltip" hidden></div>
+</body>
+</html>

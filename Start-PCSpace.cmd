@@ -1,8 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set "PCSPACE_PY=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-if not exist "%PCSPACE_PY%" set "PCSPACE_PY=python"
-"%PCSPACE_PY%" -m pcspace --open
+where py >nul 2>nul
+if not errorlevel 1 (
+  py -3 bootstrap.py
+) else (
+  python bootstrap.py
+)
 if errorlevel 1 pause
 endlocal
