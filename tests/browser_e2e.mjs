@@ -1,0 +1,74 @@
+// Real Chromium/CDP test. Uses disposable fixtures and an isolated browser profile.
+// Requires Node >=22 with built-in WebSocket and an installed Chrome or Edge.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const project=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const base=fs.mkdtempSync(path.join(os.tmpdir(),'PCSpaceBrowser-'));
+const output=path.join(project,'browser-results');fs.mkdirSync(output,{recursive:true});
+const python=process.env.PCSPACE_TEST_PYTHON || path.join(process.env.LOCALAPPDATA||'', 'Programs','Python','Python312','python.exe');
+const candidates=[process.env.PCSPACE_TEST_CHROME,'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe','C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'].filter(Boolean);
+const chrome=candidates.find(x=>fs.existsSync(x));
+if(!chrome)throw Error('No installed test browser; set PCSPACE_TEST_CHROME.');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(f,timeout=15000){const start=Date.now();let last;while(Date.now()-start<timeout){try{const v=await f();if(v)return v;}catch(e){last=e;}await sleep(120);}throw Error('Timed out: '+(last?.message||f.toString().slice(0,120)));}
+async function port(){const s=net.createServer();await new Promise((ok,fail)=>s.once('error',fail).listen(0,'127.0.0.1',ok));const n=s.address().port;await new Promise(ok=>s.close(ok));return n;}
+let server,browser,ws;const passed=[],errors=[];
+const assert=(v,message)=>{if(!v)throw Error(message);passed.push(message);};
+try{
+ const appPort=await port(),origin=`http://127.0.0.1:${appPort}`;
+ const log=fs.openSync(path.join(base,'server.log'),'a');
+ server=spawn(python,['-m','tests.browser_fixture','--base',base,'--port',String(appPort)],{cwd:project,stdio:['ignore',log,log],windowsHide:true});
+ await until(async()=>{const r=await fetch(origin+'/health');return r.ok;});
+ const fixture=JSON.parse(fs.readFileSync(path.join(base,'fixture.json'),'utf8'));
+ const profile=path.join(base,'browser-profile');
+ browser=spawn(chrome,['--headless=new','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-address=127.0.0.1','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'],{stdio:'ignore',windowsHide:true});
+ const browserPort=await until(()=>{const f=path.join(profile,'DevToolsActivePort');return fs.existsSync(f)&&Number(fs.readFileSync(f,'utf8').split('\n')[0]);});
+ const pages=await until(async()=>{const r=await fetch(`http://127.0.0.1:${browserPort}/json/list`);const p=await r.json();return p.find(x=>x.type==='page');});
+ ws=new WebSocket(pages.webSocketDebuggerUrl);await new Promise((ok,fail)=>{ws.onopen=ok;ws.onerror=fail;});
+ let seq=0;const pending=new Map();
+ ws.onmessage=e=>{const msg=JSON.parse(e.data);if(msg.id){const q=pending.get(msg.id);if(q){pending.delete(msg.id);msg.error?q.reject(Error(msg.error.message)):q.resolve(msg.result);}}else if(msg.method==='Runtime.exceptionThrown'){errors.push(msg.params.exceptionDetails.text+': '+(msg.params.exceptionDetails.exception?.description||''));}};
+ const cdp=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
+ const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true,userGesture:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
+ const wait=expression=>until(()=>evaluate(expression));
+ const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+ const fill=(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ await cdp('Runtime.enable');await cdp('Page.enable');
+ await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1100,deviceScaleFactor:1,mobile:false});
+ await cdp('Page.navigate',{url:origin});
+ await wait(`S.csrf && S.dashboard`);
+ assert(await evaluate(`document.querySelector('input[type="password"]')===null && !document.getElementById('connect-error').hidden===false`),'Automatic local session, no password entry');
+ await fill('#scan-root',fixture.root);await click('#start-scan');
+ await wait(`S.tree && ['complete','complete_with_exclusions'].includes(S.tree.scan.status)`);
+ assert(await evaluate(`S.tree.scan.files===7`),'Directory-first scan counted all seven fixtures');
+ assert(await evaluate(`document.querySelectorAll('.tile').length>=5`),'Top-level capacity treemap rendered');
+ assert(await evaluate(`document.getElementById('metric-candidate').textContent !== '0 B'`),'Candidate capacity surfaced without declaring all large files waste');
+ let shot=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(output,'overview.png'),Buffer.from(shot.data,'base64'));
+ await evaluate(`Array.from(document.querySelectorAll('.tile')).find(e=>e.getAttribute('aria-label').startsWith('Workspace ')).click()`);
+ await wait(`S.tree.path.endsWith('Workspace')`);
+ assert(await evaluate(`S.tree.folders[0].name==='node_modules'`),'Clicking parent tile drills down to dependency folder');
+ await click('#go-up');await wait(`S.tree.path === ${JSON.stringify(fixture.root)}`);
+ const selectFolder=async name=>evaluate(`Array.from(document.querySelectorAll('#entry-list [data-select]')).find(e=>e.dataset.select === ${JSON.stringify(path.join(fixture.root,''))}+${JSON.stringify(path.sep+name)}).click()`);
+ await selectFolder('Backups');await click('#recycle-selected');await wait(`document.getElementById('confirm-operation')!==null`);
+ assert(await evaluate(`document.querySelectorAll('#operation-modal input').length===0`),'Folder recycle uses one confirmation without reasons or typed phrases');
+ assert(fs.existsSync(path.join(fixture.root,'Backups')),'Preview does not move any file');
+ await click('#confirm-operation');await wait(`S.plan && S.plan.status==='complete'`);
+ assert(!fs.existsSync(path.join(fixture.root,'Backups')),'Native Windows recycle moved only selected fixture folder');
+ await click('#done-operation');await selectFolder('Obsolete');await click('#delete-selected');await wait(`document.getElementById('confirm-operation')!==null`);
+ assert(await evaluate(`document.getElementById('modal-body').textContent.includes('복원할 수 없습니다')`),'Permanent deletion warning displayed in one confirmation');
+ await click('#confirm-operation');await wait(`S.plan && S.plan.action==='delete' && S.plan.status==='complete'`);
+ assert(!fs.existsSync(path.join(fixture.root,'Obsolete')),'Direct permanent folder deletion completed on fixtures');
+ assert(fs.existsSync(path.join(fixture.root,'Photos','photo-original.dng')) && fs.existsSync(path.join(fixture.root,'keep-notes.txt')),'Unselected original-looking fixtures preserved');
+ await click('#done-operation');await click('[data-view="history"]');await wait(`document.querySelectorAll('.history-card').length===2`);
+ assert(true,'Both operations recorded');await click('[data-view="map"]');
+ await cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await sleep(700);
+ assert(await evaluate(`document.documentElement.scrollWidth<=window.innerWidth+2`),'Mobile layout has no horizontal overflow');
+ shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(output,'mobile.png'),Buffer.from(shot.data,'base64'));
+ assert(errors.length===0,'No uncaught browser JavaScript errors');
+ const result={status:'passed',checks:passed.length,passed,errors,fixturesOnly:true,browser:chrome,base,at:new Date().toISOString()};
+ fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+}catch(e){const result={status:'failed',passed,error:e.stack,errors,base};fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(result,null,2));console.error(JSON.stringify(result,null,2));process.exitCode=1;
+}finally{try{ws?.close();}catch{}if(browser)browser.kill();if(server)server.kill();}

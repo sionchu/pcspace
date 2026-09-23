@@ -1,0 +1,26 @@
+# Local runtime, historical deployment copies, and private data
+.deps/
+.update*/
+__pycache__/
+.pytest_cache/
+.venv/
+.test-venv/
+*.py[cod]
+*.sqlite*
+*.db
+*-wal
+*-shm
+policy.json
+access-key.txt
+.env
+.env.*
+*.log
+*.b64
+*.zip
+*.xz
+browser-results/
+build/
+dist/
+*.egg-info/
+_site/
+.DS_Store
