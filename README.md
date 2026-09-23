@@ -19,7 +19,7 @@ PCSpace is a **local-first Windows storage explorer** with an interactive treema
 ## Start in a minute
 
 1. Install **Python 3.12+** on Windows 10/11, with the Python launcher or Python on PATH.
-2. Download `PCSpace-0.3.0-source.zip` from [Releases](https://github.com/sionchu/pcspace/releases) and extract it.
+2. Open [Releases](https://github.com/sionchu/pcspace/releases), download **Source code (zip)**, and extract it.
 3. Double-click **`Start-PCSpace.cmd`**.
 
 The first launch creates a private `.venv` and downloads the Python dependencies. Later launches reuse it. Your browser opens at **`http://127.0.0.1:8768`**. Keep the console open; Ctrl+C stops the app. No administrator permission is required. This release is source-based, not a standalone EXE.

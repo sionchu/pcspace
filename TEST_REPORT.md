@@ -34,3 +34,7 @@ Node 22+ and installed Chrome/Edge are needed for the browser suite. Set `PCSPAC
 The 500,010-entry scan test is synthetic and demonstrates removal of the old cap, not a real-drive speed claim. Sizes are logical bytes; hardlinks, compression and sparse disks can differ from allocation or reclaimable capacity. Scans can become stale during external changes. Recycle contents occupy disk space until emptied. Permanent deletion has no app undo. Unknown cloud providers and malicious concurrent file replacement are not exhaustively verified. A same-user process can bypass app-level safeguards. See SECURITY.md.
 
 Current third-party test dependencies emit an AnyIO/Starlette deprecation warning; this did not fail the tests. No claim is made that the code is warning-free.
+
+## Hosted CI verification
+
+[CI run 35895822482](https://github.com/sionchu/pcspace/actions/runs/35895822482) passed all four jobs (Windows/Linux, Python 3.12/3.13), including package builds. [Demo deployment 35895822468](https://github.com/sionchu/pcspace/actions/runs/35895822468) succeeded; the published demo HTML and its JavaScript/CSS returned HTTP 200. These runs tested commit f4c4489; the subsequent change is this validation note and the source-download wording.

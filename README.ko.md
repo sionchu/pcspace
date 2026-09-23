@@ -11,7 +11,7 @@ PC 안에서 실행하는 폴더 중심 저장공간 관리 앱입니다. 용량
 ## 시작하기
 
 1. Windows 10/11에 **Python 3.12 이상**을 설치합니다. Python Launcher 또는 PATH가 필요합니다.
-2. Releases의 `PCSpace-0.3.0-source.zip`을 받아 압축을 풉니다.
+2. Releases의 **Source code (zip)**을 받아 압축을 풉니다.
 3. **`Start-PCSpace.cmd`를 더블클릭**합니다.
 
 처음 한 번 프로젝트 안에 `.venv`를 만들고 필요한 Python 패키지를 내려받습니다. 브라우저는 `http://127.0.0.1:8768`에서 열립니다. 실행 창을 닫으면 앱이 종료됩니다. 별도의 계정·비밀번호·Node·Remote Desktop Commander·AI API는 필요하지 않습니다. 이번 배포는 Python이 필요한 소스 배포이며 독립 실행형 EXE는 아닙니다.
